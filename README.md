@@ -54,11 +54,20 @@ Deux invariants portent le projet :
 | --- | --- |
 | 1 · Socle Tauri + React + design system iOS | ✅ |
 | 2 · Modèle de forme, éditeur, aperçu live | ✅ |
-| 3 · Rasterizer + DDS (Rust) | à faire |
-| 4 · Sidecar YTD | à faire |
-| 5 · Patcher GFX | à faire |
-| 6 · Emitter resource + Alchemist | à faire |
-| 7 · Packaging NSIS + portable | à faire |
+| 3 · Rasterizer + DDS (Rust) | ✅ |
+| 5 · Patcher GFX par splice d'octets | ✅ |
+| 6 · Emitter resource | ✅ (conversion Alchemist à brancher) |
+| 4 · Sidecar YTD | à faire — demande le SDK .NET |
+| 7 · Packaging NSIS + portable | à faire — demande un host Windows |
+
+Le cœur Rust est couvert par 28 tests. Deux d'entre eux portent le projet :
+
+- **`le_round_trip_neutre_est_identique_octet_pour_octet`** — relire puis
+  réécrire un `.gfx` sans le modifier rend un fichier identique. C'est la
+  garantie que rien n'est perdu, tags Scaleform propriétaires compris.
+- **`le_contour_rust_correspond_au_contour_typescript`** — le contour calculé
+  par Rust est comparé à celui exporté depuis TypeScript sur six familles de
+  formes. Sans lui, l'aperçu et le DDS pourraient diverger en silence.
 
 ## Développement
 
@@ -66,9 +75,21 @@ Deux invariants portent le projet :
 pnpm install
 pnpm dev        # éditeur seul, dans le navigateur
 pnpm build      # typecheck + build de production
+pnpm outlines   # régénère les contours de référence pour le test de conformité
+
+cargo test      # cœur métier Rust
 ```
 
-L'éditeur et l'aperçu fonctionnent sans aucun fichier du jeu.
+L'éditeur, l'aperçu et l'intégralité des tests fonctionnent sans aucun fichier
+du jeu.
+
+### Limite de vérification
+
+Le patcher `.gfx` est testé sur des fichiers synthétisés, pas sur un vrai
+`minimap.gfx` — aucun asset Rockstar n'étant redistribuable. La mécanique de
+splice est donc validée, mais pas la sémantique du fichier réel : identifier
+la bordure et les barres de vie dans le Scaleform d'origine reste à faire sur
+un fichier fourni par l'utilisateur.
 
 ## Assets
 

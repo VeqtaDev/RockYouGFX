@@ -1,0 +1,13 @@
+[package]
+name = "rockyougfx-core"
+description = "Génération des masques de minimap et patch des .gfx Scaleform"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# Volontairement sans dépendance à Tauri : le cœur métier doit se compiler et
+# se tester sans webkit2gtk ni toolchain graphique.
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+flate2.workspace = true
