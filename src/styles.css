@@ -1,0 +1,164 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Design system iOS. Sombre par défaut : l'app vit à côté de GTA et des outils
+   de modding, un fond clair y serait agressif.
+   Les valeurs viennent des couleurs système iOS (variantes dark).
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* Teintes système */
+  --color-ios-blue: #0a84ff;
+  --color-ios-green: #30d158;
+  --color-ios-indigo: #5e5ce6;
+  --color-ios-orange: #ff9f0a;
+  --color-ios-pink: #ff375f;
+  --color-ios-purple: #bf5af2;
+  --color-ios-red: #ff453a;
+  --color-ios-teal: #64d2ff;
+  --color-ios-yellow: #ffd60a;
+
+  /* Fonds empilés */
+  --color-bg-base: #000000;
+  --color-bg-raised: #1c1c1e;
+  --color-bg-overlay: #2c2c2e;
+  --color-bg-quaternary: #3a3a3c;
+
+  /* Libellés */
+  --color-label: #ffffff;
+  --color-label-2: rgb(235 235 245 / 0.6);
+  --color-label-3: rgb(235 235 245 / 0.3);
+  --color-label-4: rgb(235 235 245 / 0.18);
+
+  /* Remplissages et séparateurs */
+  --color-fill-1: rgb(120 120 128 / 0.36);
+  --color-fill-2: rgb(120 120 128 / 0.32);
+  --color-fill-3: rgb(120 120 128 / 0.24);
+  --color-fill-4: rgb(120 120 128 / 0.18);
+  --color-separator: rgb(84 84 88 / 0.65);
+
+  /* Rayons — échelle iOS */
+  --radius-ios-sm: 8px;
+  --radius-ios: 12px;
+  --radius-ios-lg: 16px;
+  --radius-ios-xl: 20px;
+  --radius-ios-card: 26px;
+
+  /* Typo : SF Pro si présente (macOS), repli Inter puis pile système */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter',
+    'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, monospace;
+
+  /* Grille 8pt */
+  --spacing: 4px;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-bg-base);
+    color: var(--color-label);
+    font-family: var(--font-sans);
+    /* Le rendu iOS s'appuie sur des graisses fines : sans ça le texte bave. */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv11', 'ss01';
+    letter-spacing: -0.011em;
+    overflow: hidden;
+  }
+
+  /* Une app desktop ne se sélectionne pas au drag comme une page web. */
+  body {
+    user-select: none;
+    cursor: default;
+  }
+
+  input,
+  textarea {
+    user-select: text;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-fill-3);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-fill-1);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@utility material {
+  /* Le « material » iOS : flou + saturation, pas une simple couche opaque. */
+  background-color: rgb(30 30 32 / 0.72);
+  backdrop-filter: saturate(180%) blur(30px);
+  -webkit-backdrop-filter: saturate(180%) blur(30px);
+}
+
+@utility material-thick {
+  background-color: rgb(22 22 24 / 0.86);
+  backdrop-filter: saturate(180%) blur(40px);
+  -webkit-backdrop-filter: saturate(180%) blur(40px);
+}
+
+@utility text-title-lg {
+  font-size: 34px;
+  line-height: 41px;
+  font-weight: 700;
+  letter-spacing: -0.026em;
+}
+
+@utility text-title {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.021em;
+}
+
+@utility text-headline {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+}
+
+@utility text-body {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+@utility text-footnote {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: -0.006em;
+}
+
+@utility text-caption {
+  font-size: 11px;
+  line-height: 13px;
+  font-weight: 500;
+  letter-spacing: 0.006em;
+}

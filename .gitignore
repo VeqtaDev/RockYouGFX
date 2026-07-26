@@ -1,0 +1,11 @@
+node_modules/
+dist/
+target/
+*.local
+.DS_Store
+.vite/
+
+# Fichiers du jeu : ne jamais versionner d'assets Rockstar.
+*.ytd
+*.gfx
+*.rpf
