@@ -1,0 +1,30 @@
+# Workspace autonome, délibérément détaché de celui de la racine.
+#
+# Rattaché au workspace principal, un `cargo test` à la racine tenterait de
+# compiler Tauri, qui réclame webkit2gtk sous Linux. Le cœur métier resterait
+# donc intestable en conteneur headless — exactement ce qu'on veut éviter.
+[workspace]
+
+[package]
+name = "rockyougfx"
+version = "0.1.0"
+edition = "2021"
+description = "Éditeur de minimap GTA V pour FiveM"
+license = "MIT"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rockyougfx-core = { path = "../crates/core" }
+
+[profile.release]
+# L'exécutable portable est distribué seul : sa taille compte directement.
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

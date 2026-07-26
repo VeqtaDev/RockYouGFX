@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "RockYouGFX",
+  "version": "0.1.0",
+  "identifier": "re.rockyougfx.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5183",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "RockYouGFX",
+        "width": 1280,
+        "height": 840,
+        "minWidth": 1024,
+        "minHeight": 680,
+        "resizable": true,
+        "theme": "Dark"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Éditeur de minimap GTA V pour FiveM",
+    "longDescription": "Dessine la forme de la minimap et génère une resource FiveM prête à l'emploi : masques alpha et Scaleform cohérents entre eux."
+  }
+}

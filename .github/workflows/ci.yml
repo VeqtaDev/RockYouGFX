@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    # Le cœur métier est volontairement sans dépendance à Tauri : il se teste
+    # donc sous Linux, sans webkit2gtk ni toolchain graphique.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck et build du frontend
+        run: pnpm build
+
+      - name: Tests du cœur Rust
+        run: cargo test --workspace
+
+      - name: Les contours de référence sont à jour
+        # Si le modèle de forme change côté TypeScript sans que les fixtures
+        # soient régénérées, le test de conformité valide un oracle périmé.
+        run: |
+          pnpm outlines
+          git diff --exit-code crates/core/tests/fixtures/outlines.json \
+            || (echo "::error::Contours de référence périmés — lance 'pnpm outlines' et commite." && exit 1)

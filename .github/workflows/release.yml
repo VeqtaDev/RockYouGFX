@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag de la release (ex. v0.1.0)"
+        required: true
+        default: v0.1.0
+      prerelease:
+        description: "Marquer comme préversion"
+        type: boolean
+        default: true
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    # Tauri ne se cross-compile pas raisonnablement vers Windows : la cible
+    # MSVC et WebView2 imposent un runner Windows.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      # `tauri build` déclenche lui-même `beforeBuildCommand` (pnpm build),
+      # qui typecheck puis construit le frontend.
+      - name: Build de l'application
+        run: pnpm tauri build --target x86_64-pc-windows-msvc
+
+      - name: Détermination du tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=${{ inputs.prerelease }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collecte des artefacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-release
+          base=src-tauri/target/x86_64-pc-windows-msvc/release
+
+          # L'exécutable nu EST le portable : aucun DLL à côté, WebView2 étant
+          # un composant système depuis Windows 10.
+          cp "$base/RockYouGFX.exe" "dist-release/RockYouGFX-${{ steps.meta.outputs.tag }}-portable.exe"
+
+          # L'installeur NSIS, dont le nom porte la version du tauri.conf.
+          setup=$(find "$base/bundle/nsis" -name '*-setup.exe' | head -n 1)
+          if [ -z "$setup" ]; then
+            echo "::error::Installeur NSIS introuvable"
+            exit 1
+          fi
+          cp "$setup" "dist-release/RockYouGFX-${{ steps.meta.outputs.tag }}-setup.exe"
+
+          ls -la dist-release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: dist-release/*
+
+      - name: Publication de la release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag='${{ steps.meta.outputs.tag }}'
+          flags=()
+          [ '${{ steps.meta.outputs.prerelease }}' = 'true' ] && flags+=(--prerelease)
+
+          cat > notes.md <<'NOTES'
+          Éditeur de forme de minimap GTA V pour FiveM.
+
+          ## Téléchargements
+
+          | Fichier | Usage |
+          | --- | --- |
+          | `RockYouGFX-…-portable.exe` | Aucune installation. WebView2 étant un composant système depuis Windows 10, l'exécutable se suffit à lui-même. |
+          | `RockYouGFX-…-setup.exe` | Installeur classique (NSIS), avec raccourcis et désinstallation. |
+
+          ## Ce que fait cette version
+
+          L'éditeur de forme est complet et fonctionne sans aucun fichier du
+          jeu : presets, rayon par coin, lissage continu de l'arc de cercle au
+          squircle, adoucissement, bordure, et modes HUD.
+
+          ## Ce qu'elle ne fait pas encore
+
+          L'export de la resource FiveM n'est pas branché : le repack du
+          `.ytd` demande un composant qui reste à intégrer. La génération des
+          masques et l'inspection des `.gfx` sont en place côté moteur, mais
+          pas encore reliées à l'interface.
+
+          Rappel utile : la forme du radar vient du canal alpha de
+          `radarmasksm.dds` / `radarmasklg.dds` dans `graphics.ytd`, pas du
+          `.gfx`. Ne remplacer que le `.gfx` ne change rien à la forme.
+          NOTES
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist-release/* --clobber
+          else
+            gh release create "$tag" dist-release/* \
+              --title "RockYouGFX $tag" \
+              --notes-file notes.md \
+              "${flags[@]}"
+          fi
