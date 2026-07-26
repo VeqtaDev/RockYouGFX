@@ -123,20 +123,26 @@ jobs:
           rayon par coin, lissage continu de l'arc de cercle au squircle,
           adoucissement, bordure et modes HUD.
 
-          L'export produit les masques, un `client.lua`, le `fxmanifest.lua` et
-          une notice. Le `client.lua` masque les barres de vie et d'armure en
-          appelant le Scaleform vanilla, ce qui évite d'avoir à modifier
-          `minimap.gfx`.
+          L'export produit une resource complète. Désignez votre `graphics.ytd`
+          dans la feuille d'export : il est patché directement, et la resource
+          est prête à déposer dans `resources/`. Votre fichier d'origine n'est
+          pas modifié.
+
+          Le `client.lua` masque les barres de vie et d'armure en appelant le
+          Scaleform vanilla, ce qui évite d'avoir à modifier `minimap.gfx`.
 
           Depuis la v0.1.2, la version portable se met à jour toute seule. Une
           version antérieure ne le peut pas : un binaire ne contient que le code
           présent à son build.
 
+          Pensez à vider le cache FiveM après installation
+          (`%localappdata%\\FiveM\\FiveM.app\\data\\cache`) : un asset streamé
+          déjà en cache masquerait le changement.
+
           ## Ce qu'elle ne fait pas encore
 
-          L'injection des masques dans `graphics.ytd` reste manuelle, via OpenIV
-          ou CodeWalker. La marche à suivre est dans le `LISEZ-MOI.md` produit
-          avec la resource.
+          Le `minimap.gfx` n'est pas modifié : la bordure et la boussole restent
+          celles du vanilla, même si la forme du radar change.
 
           ## Rappel utile
 
