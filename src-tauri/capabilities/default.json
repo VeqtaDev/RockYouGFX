@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capacités de la fenêtre principale. Aucun plugin n'est activé : l'accès au disque passe uniquement par les commandes déclarées dans main.rs.",
+  "description": "Capacités de la fenêtre principale. Seuls dialog (choix du dossier de sortie) et opener (ouvrir le dossier produit) sont activés. Toute écriture sur le disque passe par les commandes déclarées dans main.rs, jamais par un plugin de système de fichiers.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:default", "opener:default"]
 }

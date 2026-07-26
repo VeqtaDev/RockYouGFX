@@ -9,3 +9,6 @@ target/
 *.ytd
 *.gfx
 *.rpf
+
+# Fichiers du jeu fournis pour le développement (jamais versionnés).
+fixtures/game/

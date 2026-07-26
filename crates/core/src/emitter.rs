@@ -72,6 +72,59 @@ pub fn build_resource(
     files
 }
 
+/// Notice accompagnant l'export.
+///
+/// Les masques ne peuvent pas être streamés tels quels : GTA V ne lit pas de
+/// `.dds` isolé, il lit un dictionnaire de textures. Il reste donc une étape
+/// manuelle d'injection dans `graphics.ytd`, et cette notice existe pour que
+/// l'utilisateur ne se retrouve pas devant un dossier dont il ne sait que
+/// faire.
+pub fn readme(name: &str) -> String {
+    format!(
+        r#"# {name}
+
+Généré par RockYouGFX.
+
+## Il reste une étape, et une seule
+
+Les deux fichiers du dossier `masks/` ne sont **pas** utilisables tels quels :
+GTA V ne lit pas un `.dds` isolé, il lit un dictionnaire de textures. Il faut
+les injecter dans `graphics.ytd`.
+
+1. Ouvrir OpenIV ou CodeWalker.
+2. Aller dans `update/update.rpf/x64/textures/graphics.ytd`.
+3. Extraire `graphics.ytd` (mode édition activé).
+4. L'ouvrir, puis **remplacer** les deux textures existantes par celles du
+   dossier `masks/` : `radarmasksm` et `radarmasklg`.
+   Remplacer, pas ajouter — les noms doivent rester identiques.
+5. Enregistrer, puis déposer le `graphics.ytd` obtenu dans le dossier
+   `stream/` de cette resource.
+
+## Installation
+
+Copier ce dossier dans le `resources/` du serveur, puis ajouter dans le
+`server.cfg` :
+
+```
+ensure {name}
+```
+
+## Pourquoi ces masques et pas un minimap.gfx
+
+La forme du radar vient du canal alpha de `radarmasksm.dds` et
+`radarmasklg.dds`. Le `minimap.gfx` ne porte que ce qui est dessiné par-dessus :
+bordure, barres de vie et d'armure, boussole.
+
+Ne remplacer que le `.gfx` ne change donc **rien** à la forme. C'est l'erreur
+la plus courante quand on personnalise une minimap.
+
+`radarmasksm` est la minimap courante, `radarmasklg` la carte agrandie. Les
+deux dérivent de la même forme : ne remplacer que l'une donne un radar qui
+change d'allure dès qu'on ouvre la carte.
+"#
+    )
+}
+
 /// Décrit ce qui manque pour que la resource soit cohérente en jeu.
 pub fn warnings(files: &[ResourceFile]) -> Vec<String> {
     let has = |p: &str| files.iter().any(|f| f.path == p);

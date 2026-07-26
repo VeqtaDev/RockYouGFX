@@ -2,6 +2,8 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { MinimapPreview } from './components/MinimapPreview'
 import { UpdateBanner } from './components/UpdateBanner'
+import { ExportSheet } from './components/ExportSheet'
+import { isTauri } from './lib/tauri'
 import { Button, Row, Section, Segmented, Slider, Switch, spring } from './components/ui'
 import {
   POLYGON_MAX_SIDES,
@@ -32,6 +34,7 @@ const pct = (v: number) => `${Math.round(v * 100)}%`
 export default function App() {
   const [shape, setShape] = useState<MinimapShape>(defaultShape)
   const [linkCorners, setLinkCorners] = useState(true)
+  const [exporting, setExporting] = useState(false)
 
   const patch = (p: Partial<MinimapShape>) => setShape((s) => ({ ...s, ...p }))
 
@@ -216,14 +219,22 @@ export default function App() {
         </Section>
 
         <div className="px-1">
-          <Button variant="filled" disabled>
+          <Button variant="filled" onClick={() => setExporting(true)}>
             Exporter la resource
           </Button>
           <p className="text-footnote mt-2 text-label-3">
-            Nécessite les fichiers du jeu — lot&nbsp;4 à venir.
+            {isTauri()
+              ? 'Masques, script client et manifeste. Une étape manuelle reste pour le .ytd.'
+              : "L'export n'est disponible que dans l'application, pas dans le navigateur."}
           </p>
         </div>
       </aside>
+
+      <ExportSheet
+        shape={shape}
+        open={exporting}
+        onClose={() => setExporting(false)}
+      />
     </div>
   )
 }

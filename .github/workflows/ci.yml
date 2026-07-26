@@ -38,9 +38,46 @@ jobs:
         run: cargo test --workspace
 
       - name: Les contours de référence sont à jour
+        id: outlines
         # Si le modèle de forme change côté TypeScript sans que les fixtures
         # soient régénérées, le test de conformité valide un oracle périmé.
         run: |
           pnpm outlines
           git diff --exit-code crates/core/tests/fixtures/outlines.json \
             || (echo "::error::Contours de référence périmés — lance 'pnpm outlines' et commite." && exit 1)
+
+  tauri:
+    # src-tauri ne se compile pas sous Linux sans webkit2gtk, et l'environnement
+    # de développement principal du projet en est dépourvu. Sans ce job, une
+    # erreur de compilation du wrapper ne se découvrirait qu'au moment d'une
+    # release — six minutes de build plus tard.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      # tauri-build lit frontendDist au moment du build.rs : sans dist/,
+      # la compilation échoue avant même d'atteindre le code.
+      - run: pnpm build
+
+      - name: Compilation du wrapper Tauri
+        run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
+
+      - name: Tests du wrapper
+        run: cargo test --manifest-path src-tauri/Cargo.toml

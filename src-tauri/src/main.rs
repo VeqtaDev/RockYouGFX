@@ -101,25 +101,95 @@ fn gfx_summary(path: String) -> CmdResult<serde_json::Value> {
     }))
 }
 
-/// Écrit l'arborescence de la resource FiveM.
-///
-/// Le script client est dérivé de la forme, pas fourni par l'appelant : il
-/// remplace le patch du `.gfx` pour tout ce que les natives savent faire, ce
-/// qui permet de produire une resource sans aucun asset Rockstar.
-#[tauri::command]
-fn write_resource(
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportRequest {
     shape: MinimapShape,
     name: String,
     out_dir: String,
     enhanced: bool,
-    graphics_ytd: Option<Vec<u8>>,
-    minimap_gfx: Option<Vec<u8>>,
-) -> CmdResult<serde_json::Value> {
-    let target = if enhanced { emitter::Target::Enhanced } else { emitter::Target::Legacy };
-    let client_lua = lua::client_script(&shape);
-    let files = emitter::build_resource(&name, target, graphics_ytd, minimap_gfx, client_lua);
-    let root = PathBuf::from(&out_dir).join(&name);
+    /// Dimensions de `radarmasksm`, reprises de la texture vanilla.
+    mask_sm: (u32, u32),
+    /// Dimensions de `radarmasklg`.
+    mask_lg: (u32, u32),
+}
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportReport {
+    root: String,
+    files: Vec<String>,
+    warnings: Vec<String>,
+    limitations: Vec<String>,
+    /// Nom réellement utilisé, une fois assaini.
+    resource_name: String,
+}
+
+/// Un nom de resource FiveM ne peut pas contenir d'espace ni d'accent : le
+/// `ensure` du server.cfg ne le retrouverait pas. On assainit plutôt que de
+/// laisser l'utilisateur produire un dossier qui ne se chargera jamais.
+fn sanitize_resource_name(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let mut prev_dash = false;
+    for c in raw.trim().chars() {
+        let c = c.to_ascii_lowercase();
+        if c.is_ascii_alphanumeric() || c == '_' {
+            out.push(c);
+            prev_dash = false;
+        } else if !prev_dash && !out.is_empty() {
+            out.push('-');
+            prev_dash = true;
+        }
+    }
+    let trimmed = out.trim_end_matches('-').to_string();
+    if trimmed.is_empty() {
+        "minimap".into()
+    } else {
+        trimmed
+    }
+}
+
+/// Écrit la resource FiveM complète : masques, script client, manifeste, notice.
+///
+/// Le script client est dérivé de la forme, pas fourni par l'appelant : il
+/// remplace le patch du `.gfx` pour tout ce que les natives savent faire, ce
+/// qui permet de produire une resource sans aucun asset Rockstar.
+///
+/// Les masques atterrissent dans `masks/` et non dans `stream/` : ce sont des
+/// `.dds` bruts, que GTA V ne sait pas lire isolément. Ils doivent d'abord
+/// être injectés dans `graphics.ytd`. Les placer dans `stream/` laisserait
+/// croire que la resource est complète.
+#[tauri::command]
+fn export_resource(req: ExportRequest) -> CmdResult<ExportReport> {
+    for (label, (w, h)) in [("radarmasksm", req.mask_sm), ("radarmasklg", req.mask_lg)] {
+        if w == 0 || h == 0 {
+            return Err(format!("dimensions nulles pour {label}"));
+        }
+        // Au-delà, la rasterisation par champ de distance devient très lente
+        // pour un masque qui n'a aucune raison d'être si grand.
+        if w > 4096 || h > 4096 {
+            return Err(format!("{label} : {w}×{h} dépasse la limite de 4096"));
+        }
+    }
+
+    let name = sanitize_resource_name(&req.name);
+    let target =
+        if req.enhanced { emitter::Target::Enhanced } else { emitter::Target::Legacy };
+
+    let client_lua = lua::client_script(&req.shape);
+    let mut files = emitter::build_resource(&name, target, None, None, client_lua);
+    files.push(emitter::ResourceFile {
+        path: "LISEZ-MOI.md".into(),
+        data: emitter::readme(&name).into_bytes(),
+    });
+    for (tex, (w, h)) in [("radarmasksm", req.mask_sm), ("radarmasklg", req.mask_lg)] {
+        files.push(emitter::ResourceFile {
+            path: format!("masks/{tex}.dds"),
+            data: dds::write_mask(&mask::rasterize(&req.shape, w, h)),
+        });
+    }
+
+    let root = PathBuf::from(&req.out_dir).join(&name);
     for f in &files {
         let dest = root.join(&f.path);
         if let Some(parent) = dest.parent() {
@@ -128,25 +198,53 @@ fn write_resource(
         std::fs::write(&dest, &f.data).map_err(|e| io_err("écriture du fichier", e))?;
     }
 
-    Ok(serde_json::json!({
-        "root": root.to_string_lossy(),
-        "files": files.iter().map(|f| f.path.clone()).collect::<Vec<_>>(),
+    Ok(ExportReport {
+        root: root.to_string_lossy().into_owned(),
+        files: files.iter().map(|f| f.path.clone()).collect(),
         // Une resource incomplète produit une minimap incohérente : on le dit
         // plutôt que de laisser l'utilisateur le découvrir en jeu.
-        "warnings": emitter::warnings(&files),
+        warnings: emitter::warnings(&files),
         // Ce que les natives Lua ne savent pas faire et qui exigerait un .gfx.
-        "limitations": lua::limitations(&shape),
-    }))
+        limitations: lua::limitations(&req.shape),
+        resource_name: name,
+    })
 }
 
 fn main() {
     tauri::Builder::default()
+        // dialog : sélection du dossier de sortie et des DDS vanilla.
+        // opener : ouvrir le dossier produit dans l'explorateur.
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             dds_info,
             export_masks,
-            gfx_summary,
-            write_resource
+            export_resource,
+            gfx_summary
         ])
         .run(tauri::generate_context!())
         .expect("échec du lancement de RockYouGFX");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_resource_name;
+
+    #[test]
+    fn le_nom_de_resource_est_assaini() {
+        assert_eq!(sanitize_resource_name("Ma Minimap"), "ma-minimap");
+        assert_eq!(sanitize_resource_name("  Minimap Ronde  "), "minimap-ronde");
+        // Les accents ne passent pas dans un nom de resource FiveM.
+        assert_eq!(sanitize_resource_name("carré"), "carr");
+        assert_eq!(sanitize_resource_name("a___b"), "a___b");
+        assert_eq!(sanitize_resource_name("!!!"), "minimap");
+        assert_eq!(sanitize_resource_name(""), "minimap");
+    }
+
+    /// Un tiret final produirait `ensure ma-minimap-`, qui ne résout pas.
+    #[test]
+    fn aucun_tiret_en_fin_de_nom() {
+        assert_eq!(sanitize_resource_name("minimap !"), "minimap");
+        assert_eq!(sanitize_resource_name("minimap - "), "minimap");
+    }
 }
