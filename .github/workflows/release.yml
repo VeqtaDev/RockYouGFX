@@ -110,25 +110,40 @@ jobs:
 
           | Fichier | Usage |
           | --- | --- |
-          | `RockYouGFX-…-portable.exe` | Aucune installation. WebView2 étant un composant système depuis Windows 10, l'exécutable se suffit à lui-même. |
+          | `RockYouGFX-…-portable.exe` | Aucune installation. À placer dans un dossier vous appartenant, **pas** dans `Program Files` : la mise à jour automatique doit pouvoir y écrire. |
           | `RockYouGFX-…-setup.exe` | Installeur classique (NSIS), avec raccourcis et désinstallation. |
+          | `SHA256SUMS.txt` | Empreintes, utilisées par la mise à jour automatique. |
+
+          L'exécutable n'étant pas signé, Windows affichera « Windows a protégé
+          votre ordinateur » : *Informations complémentaires* → *Exécuter quand même*.
 
           ## Ce que fait cette version
 
-          L'éditeur de forme est complet et fonctionne sans aucun fichier du
-          jeu : presets, rayon par coin, lissage continu de l'arc de cercle au
-          squircle, adoucissement, bordure, et modes HUD.
+          L'éditeur de forme fonctionne sans aucun fichier du jeu : presets,
+          rayon par coin, lissage continu de l'arc de cercle au squircle,
+          adoucissement, bordure et modes HUD.
+
+          L'export produit les masques, un `client.lua`, le `fxmanifest.lua` et
+          une notice. Le `client.lua` masque les barres de vie et d'armure en
+          appelant le Scaleform vanilla, ce qui évite d'avoir à modifier
+          `minimap.gfx`.
+
+          Depuis la v0.1.2, la version portable se met à jour toute seule. Une
+          version antérieure ne le peut pas : un binaire ne contient que le code
+          présent à son build.
 
           ## Ce qu'elle ne fait pas encore
 
-          L'export de la resource FiveM n'est pas branché : le repack du
-          `.ytd` demande un composant qui reste à intégrer. La génération des
-          masques et l'inspection des `.gfx` sont en place côté moteur, mais
-          pas encore reliées à l'interface.
+          L'injection des masques dans `graphics.ytd` reste manuelle, via OpenIV
+          ou CodeWalker. La marche à suivre est dans le `LISEZ-MOI.md` produit
+          avec la resource.
 
-          Rappel utile : la forme du radar vient du canal alpha de
-          `radarmasksm.dds` / `radarmasklg.dds` dans `graphics.ytd`, pas du
-          `.gfx`. Ne remplacer que le `.gfx` ne change rien à la forme.
+          ## Rappel utile
+
+          La forme du radar vient de la **luminance** de `radarmasksm` et
+          `radarmasklg`, deux textures DXT1 logées dans `graphics.ytd`. Le
+          `.gfx` ne porte que ce qui est dessiné par-dessus : bordure, barres,
+          boussole. Ne remplacer que le `.gfx` ne change donc rien à la forme.
           NOTES
 
           if gh release view "$tag" >/dev/null 2>&1; then
