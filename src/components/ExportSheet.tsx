@@ -7,6 +7,7 @@ import {
   isTauri,
   pickDds,
   pickDirectory,
+  pickYtd,
   revealInExplorer,
   type ExportReport,
 } from '../lib/tauri'
@@ -38,6 +39,7 @@ export function ExportSheet({
   const [enhanced, setEnhanced] = useState(false)
   const [maskSm, setMaskSm] = useState<Size>(DEFAULT_MASK)
   const [maskLg, setMaskLg] = useState<Size>(DEFAULT_MASK)
+  const [ytdPath, setYtdPath] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [report, setReport] = useState<ExportReport | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -63,7 +65,15 @@ export function ExportSheet({
     setError(null)
     try {
       setReport(
-        await exportResource({ shape, name, outDir, enhanced, maskSm, maskLg }),
+        await exportResource({
+          shape,
+          name,
+          outDir,
+          enhanced,
+          maskSm,
+          maskLg,
+          graphicsYtdPath: ytdPath ?? undefined,
+        }),
       )
     } catch (e) {
       setError(String(e))
@@ -127,6 +137,32 @@ export function ExportSheet({
                   <Row label="GTA V Enhanced" detail="Décoché = Legacy (gen8)">
                     <Switch checked={enhanced} onChange={setEnhanced} />
                   </Row>
+                </Section>
+
+                <Section title="graphics.ytd">
+                  <Row
+                    label="Fichier vanilla"
+                    detail={
+                      ytdPath ??
+                      "Sans lui, l'injection des masques reste à faire à la main"
+                    }
+                  >
+                    <Button
+                      variant="tinted"
+                      onClick={async () => {
+                        const p = await pickYtd('graphics.ytd extrait du jeu')
+                        if (p) setYtdPath(p)
+                      }}
+                    >
+                      Choisir
+                    </Button>
+                  </Row>
+                  <div className="text-footnote px-4 py-3 text-label-2">
+                    À extraire une fois avec OpenIV ou CodeWalker, depuis{' '}
+                    <span className="font-mono">x64/textures/graphics.ytd</span>. Le
+                    fichier fourni n'est pas modifié : une copie patchée est écrite
+                    dans la resource.
+                  </div>
                 </Section>
 
                 <Section title="Dimensions des masques">
@@ -238,6 +274,21 @@ function Result({ report, onClose }: { report: ExportReport; onClose: () => void
           ))}
         </div>
       </Section>
+
+      {report.patchedTextures.length > 0 && (
+        <Section title="graphics.ytd patché">
+          {report.patchedTextures.map((t) => (
+            <div key={t} className="text-footnote px-4 py-3 font-mono text-ios-green">
+              {t}
+            </div>
+          ))}
+          <div className="text-footnote px-4 py-3 text-label-2">
+            La resource est complète : déposez-la dans{' '}
+            <span className="font-mono">resources/</span> et ajoutez son{' '}
+            <span className="font-mono">ensure</span> au server.cfg.
+          </div>
+        </Section>
+      )}
 
       {report.warnings.length > 0 && (
         <Section title="Il reste une étape">

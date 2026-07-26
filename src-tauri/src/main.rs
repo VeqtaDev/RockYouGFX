@@ -4,7 +4,7 @@
 
 mod updater;
 
-use rockyougfx_core::{dds, emitter, gfx, lua, mask, shape::MinimapShape};
+use rockyougfx_core::{dds, emitter, gfx, lua, mask, shape::MinimapShape, ytd};
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -114,6 +114,9 @@ struct ExportRequest {
     mask_sm: (u32, u32),
     /// Dimensions de `radarmasklg`.
     mask_lg: (u32, u32),
+    /// `graphics.ytd` vanilla à patcher. Sans lui, seuls les DDS bruts sont
+    /// produits et l'injection reste à faire à la main.
+    graphics_ytd_path: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -125,6 +128,8 @@ struct ExportReport {
     limitations: Vec<String>,
     /// Nom réellement utilisé, une fois assaini.
     resource_name: String,
+    /// Textures effectivement remplacées dans le `graphics.ytd`, si fourni.
+    patched_textures: Vec<String>,
 }
 
 /// Un nom de resource FiveM ne peut pas contenir d'espace ni d'accent : le
@@ -178,12 +183,26 @@ fn export_resource(req: ExportRequest) -> CmdResult<ExportReport> {
     let target =
         if req.enhanced { emitter::Target::Enhanced } else { emitter::Target::Legacy };
 
+    // Si l'utilisateur fournit son graphics.ytd, on le patche directement :
+    // la resource est alors complète, sans étape manuelle.
+    let mut patched: Option<Vec<u8>> = None;
+    let mut patched_textures: Vec<String> = Vec::new();
+    if let Some(path) = req.graphics_ytd_path.as_deref() {
+        let raw = std::fs::read(path).map_err(|e| io_err("lecture du graphics.ytd", e))?;
+        let mut dict = ytd::Ytd::parse(&raw).map_err(|e| io_err("analyse du graphics.ytd", e))?;
+        patched_textures = rockyougfx_core::patch_graphics_ytd(&mut dict, &req.shape)?;
+        patched = Some(dict.write().map_err(|e| io_err("réécriture du graphics.ytd", e))?);
+    }
+
     let client_lua = lua::client_script(&req.shape);
-    let mut files = emitter::build_resource(&name, target, None, None, client_lua);
+    let mut files = emitter::build_resource(&name, target, patched, None, client_lua);
     files.push(emitter::ResourceFile {
         path: "LISEZ-MOI.md".into(),
         data: emitter::readme(&name).into_bytes(),
     });
+
+    // Les DDS bruts restent produits : ils servent de contrôle visuel, et de
+    // porte de sortie si l'utilisateur préfère injecter lui-même.
     for (tex, (w, h)) in [("radarmasksm", req.mask_sm), ("radarmasklg", req.mask_lg)] {
         files.push(emitter::ResourceFile {
             path: format!("masks/{tex}.dds"),
@@ -209,6 +228,7 @@ fn export_resource(req: ExportRequest) -> CmdResult<ExportReport> {
         // Ce que les natives Lua ne savent pas faire et qui exigerait un .gfx.
         limitations: lua::limitations(&req.shape),
         resource_name: name,
+        patched_textures,
     })
 }
 

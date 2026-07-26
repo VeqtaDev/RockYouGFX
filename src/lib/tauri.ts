@@ -28,6 +28,8 @@ export interface ExportReport {
   limitations: string[]
   /** Nom réellement utilisé : le backend assainit espaces et accents. */
   resourceName: string
+  /** Textures remplacées dans le graphics.ytd. Vide si aucun n'a été fourni. */
+  patchedTextures: string[]
 }
 
 export interface ExportRequest {
@@ -37,6 +39,8 @@ export interface ExportRequest {
   enhanced: boolean
   maskSm: [number, number]
   maskLg: [number, number]
+  /** graphics.ytd vanilla à patcher. Sans lui, l'injection reste manuelle. */
+  graphicsYtdPath?: string
 }
 
 export function exportResource(req: ExportRequest): Promise<ExportReport> {
@@ -58,6 +62,15 @@ export async function pickDds(title: string): Promise<string | null> {
     multiple: false,
     title,
     filters: [{ name: 'Texture DDS', extensions: ['dds'] }],
+  })
+  return typeof res === 'string' ? res : null
+}
+
+export async function pickYtd(title: string): Promise<string | null> {
+  const res = await open({
+    multiple: false,
+    title,
+    filters: [{ name: 'Dictionnaire de textures', extensions: ['ytd'] }],
   })
   return typeof res === 'string' ? res : null
 }
