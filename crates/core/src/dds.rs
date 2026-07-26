@@ -15,6 +15,7 @@ const DDSD_CAPS: u32 = 0x1;
 const DDSD_HEIGHT: u32 = 0x2;
 const DDSD_WIDTH: u32 = 0x4;
 const DDSD_PITCH: u32 = 0x8;
+const DDSD_LINEARSIZE: u32 = 0x8_0000;
 const DDSD_PIXELFORMAT: u32 = 0x1000;
 
 const DDPF_ALPHAPIXELS: u32 = 0x1;
@@ -115,6 +116,51 @@ pub fn write_mask(mask: &crate::mask::Mask) -> Vec<u8> {
     out
 }
 
+/// Sérialise des blocs DXT1 en DDS.
+///
+/// C'est le format des masques de radar dans le jeu. Un DDS non compressé
+/// serait réinterprété à l'import, et la forme — qui vit dans la luminance —
+/// n'y survivrait pas forcément. Écrire directement du DXT1 supprime toute
+/// conversion intermédiaire.
+pub fn write_dxt1(width: u32, height: u32, blocks: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(128 + blocks.len());
+    let mut push = |v: u32| out.extend_from_slice(&v.to_le_bytes());
+
+    push(MAGIC);
+    push(HEADER_SIZE);
+    // LINEARSIZE remplace PITCH pour un format compressé par blocs.
+    push(DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT | DDSD_LINEARSIZE);
+    push(height);
+    push(width);
+    push(blocks.len() as u32);
+    push(0); // depth
+    push(1); // mipMapCount
+    for _ in 0..11 {
+        push(0); // reserved1
+    }
+
+    push(PF_SIZE);
+    push(DDPF_FOURCC);
+    // Le FourCC passe par le même chemin que les autres champs : l'écrire
+    // directement emprunterait `out` alors que la fermeture le tient déjà.
+    push(u32::from_le_bytes(*b"DXT1"));
+    push(0); // bits par pixel, inutilisé en FourCC
+    push(0); // masque R
+    push(0); // masque G
+    push(0); // masque B
+    push(0); // masque A
+
+    push(DDSCAPS_TEXTURE);
+    push(0); // caps2
+    push(0); // caps3
+    push(0); // caps4
+    push(0); // reserved2
+
+    debug_assert_eq!(out.len(), 128, "en-tête DDS de taille inattendue");
+    out.extend_from_slice(blocks);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,6 +196,17 @@ mod tests {
         for (i, &a) in m.alpha.iter().enumerate() {
             assert_eq!(dds[128 + i * 4 + 3], a, "alpha divergent au pixel {i}");
         }
+    }
+
+    #[test]
+    fn le_dds_dxt1_se_relit_avec_son_fourcc() {
+        let blocks = vec![0u8; (64 / 4) * (32 / 4) * 8];
+        let dds = write_dxt1(64, 32, &blocks);
+        let info = read_info(&dds[..]).expect("en-tête illisible");
+        assert_eq!(info.width, 64);
+        assert_eq!(info.height, 32);
+        assert_eq!(info.four_cc, Some(*b"DXT1"));
+        assert_eq!(dds.len(), 128 + blocks.len());
     }
 
     #[test]

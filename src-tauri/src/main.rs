@@ -4,7 +4,7 @@
 
 mod updater;
 
-use rockyougfx_core::{dds, emitter, gfx, lua, mask, shape::MinimapShape, ytd};
+use rockyougfx_core::{dds, emitter, gfx, lua, mask, shape::MinimapShape, vanilla, ytd};
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -201,12 +201,17 @@ fn export_resource(req: ExportRequest) -> CmdResult<ExportReport> {
         data: emitter::readme(&name).into_bytes(),
     });
 
-    // Les DDS bruts restent produits : ils servent de contrôle visuel, et de
-    // porte de sortie si l'utilisateur préfère injecter lui-même.
-    for (tex, (w, h)) in [("radarmasksm", req.mask_sm), ("radarmasklg", req.mask_lg)] {
+    // Les DDS restent produits : contrôle visuel, et porte de sortie pour qui
+    // préfère injecter lui-même. Ils sont en DXT1, le format réellement attendu
+    // par le jeu — un DDS non compressé serait reconverti à l'import, et la
+    // forme, qui vit dans la luminance, n'y survivrait pas forcément.
+    for (spec, (w, h)) in
+        [(vanilla::RADAR_MASK_SM, req.mask_sm), (vanilla::RADAR_MASK_LG, req.mask_lg)]
+    {
+        let tex = vanilla::MaskTexture { width: w, height: h, ..spec };
         files.push(emitter::ResourceFile {
-            path: format!("masks/{tex}.dds"),
-            data: dds::write_mask(&mask::rasterize(&req.shape, w, h)),
+            path: format!("masks/{}.dds", spec.name),
+            data: dds::write_dxt1(w, h, &rockyougfx_core::mask_dxt1(&req.shape, &tex)),
         });
     }
 

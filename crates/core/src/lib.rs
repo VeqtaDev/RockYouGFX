@@ -76,9 +76,11 @@ fn frame_into_vanilla(shape: &MinimapShape, tex: &vanilla::MaskTexture) -> Minim
             top: vt + i.top * span_y,
             bottom: vb + i.bottom * span_y,
         },
-        // L'adoucissement est exprimé en fraction de la boîte : le ramener à
-        // l'échelle du cadre évite qu'il ne double sur la carte agrandie.
-        feather: shape.feather * span_x.min(span_y),
+        // L'adoucissement n'est délibérément pas remis à l'échelle du cadre.
+        // Il est déjà exprimé en fraction de la plus petite dimension de la
+        // *texture* ; le remettre à l'échelle éloignait des proportions
+        // vanilla au lieu de s'en rapprocher — mesuré à 33 px sur `sm` contre
+        // 54 px sur `lg`, un rapport que la mise à l'échelle triplait.
         ..shape.clone()
     }
 }

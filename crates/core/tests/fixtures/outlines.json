@@ -16,7 +16,7 @@
         "bl": 0
       },
       "smoothing": 0,
-      "feather": 0.004,
+      "feather": 0.12,
       "polygon": {
         "sides": 6,
         "rotation": 0
@@ -69,7 +69,7 @@
         "bl": 0.22
       },
       "smoothing": 0.6,
-      "feather": 0.004,
+      "feather": 0.12,
       "polygon": {
         "sides": 6,
         "rotation": 0
@@ -634,7 +634,7 @@
         "bl": 1
       },
       "smoothing": 0,
-      "feather": 0.004,
+      "feather": 0.12,
       "polygon": {
         "sides": 6,
         "rotation": 0
@@ -1199,7 +1199,7 @@
         "bl": 1
       },
       "smoothing": 1,
-      "feather": 0.004,
+      "feather": 0.12,
       "polygon": {
         "sides": 6,
         "rotation": 0
@@ -1764,7 +1764,7 @@
         "bl": 0.35
       },
       "smoothing": 0.42,
-      "feather": 0.004,
+      "feather": 0.12,
       "polygon": {
         "sides": 6,
         "rotation": 0
@@ -2329,7 +2329,7 @@
         "bl": 0.12
       },
       "smoothing": 0.6,
-      "feather": 0.004,
+      "feather": 0.12,
       "polygon": {
         "sides": 6,
         "rotation": 0.3

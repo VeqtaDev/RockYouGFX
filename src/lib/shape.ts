@@ -69,7 +69,7 @@ export function defaultShape(): MinimapShape {
     inset: { top: 0.02, right: 0.02, bottom: 0.02, left: 0.02 },
     corners: { tl: 0.22, tr: 0.22, br: 0.22, bl: 0.22 },
     smoothing: 0.6,
-    feather: 0.004,
+    feather: 0.12,
     polygon: { sides: 6, rotation: 0 },
     border: { visible: true, width: 2, color: '#000000' },
     hud: { health: 'follow', armour: 'follow', compass: 'vanilla' },
