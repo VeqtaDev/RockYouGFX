@@ -1,18 +1,21 @@
 {
   "name": "rockyougfx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Éditeur visuel de minimap GTA V pour FiveM",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test": "node --test \"src/**/*.test.ts\"",
     "preview": "vite preview",
     "tauri": "tauri",
     "outlines": "node scripts/export-reference-outlines.ts"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "dependencies": {
     "motion": "^12.23.12",
@@ -22,6 +25,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.13",
     "@tauri-apps/cli": "^2.9.1",
+    "@types/node": "^26.1.1",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",

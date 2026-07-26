@@ -13,6 +13,7 @@
 pub mod dds;
 pub mod emitter;
 pub mod gfx;
+pub mod lua;
 pub mod mask;
 pub mod shape;
 

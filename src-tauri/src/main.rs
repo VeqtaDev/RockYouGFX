@@ -2,7 +2,7 @@
 // une console noire derrière la fenêtre.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use rockyougfx_core::{dds, emitter, gfx, mask, shape::MinimapShape};
+use rockyougfx_core::{dds, emitter, gfx, lua, mask, shape::MinimapShape};
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -102,8 +102,13 @@ fn gfx_summary(path: String) -> CmdResult<serde_json::Value> {
 }
 
 /// Écrit l'arborescence de la resource FiveM.
+///
+/// Le script client est dérivé de la forme, pas fourni par l'appelant : il
+/// remplace le patch du `.gfx` pour tout ce que les natives savent faire, ce
+/// qui permet de produire une resource sans aucun asset Rockstar.
 #[tauri::command]
 fn write_resource(
+    shape: MinimapShape,
     name: String,
     out_dir: String,
     enhanced: bool,
@@ -111,7 +116,8 @@ fn write_resource(
     minimap_gfx: Option<Vec<u8>>,
 ) -> CmdResult<serde_json::Value> {
     let target = if enhanced { emitter::Target::Enhanced } else { emitter::Target::Legacy };
-    let files = emitter::build_resource(&name, target, graphics_ytd, minimap_gfx);
+    let client_lua = lua::client_script(&shape);
+    let files = emitter::build_resource(&name, target, graphics_ytd, minimap_gfx, client_lua);
     let root = PathBuf::from(&out_dir).join(&name);
 
     for f in &files {
@@ -128,6 +134,8 @@ fn write_resource(
         // Une resource incomplète produit une minimap incohérente : on le dit
         // plutôt que de laisser l'utilisateur le découvrir en jeu.
         "warnings": emitter::warnings(&files),
+        // Ce que les natives Lua ne savent pas faire et qui exigerait un .gfx.
+        "limitations": lua::limitations(&shape),
     }))
 }
 

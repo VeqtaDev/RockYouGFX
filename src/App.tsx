@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { MinimapPreview } from './components/MinimapPreview'
+import { UpdateBanner } from './components/UpdateBanner'
 import { Button, Row, Section, Segmented, Slider, Switch, spring } from './components/ui'
 import {
   POLYGON_MAX_SIDES,
@@ -48,6 +49,7 @@ export default function App() {
     <div className="flex h-full">
       {/* Aperçu */}
       <main className="relative flex-1 overflow-hidden bg-bg-base">
+        <UpdateBanner />
         <div
           className="absolute inset-0 opacity-40"
           style={{

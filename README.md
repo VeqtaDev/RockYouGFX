@@ -29,6 +29,44 @@ Modifier un seul des deux donne un résultat cassé :
 Les deux sont donc générés depuis une **définition de forme unique**
 (`src/lib/shape.ts`), ce qui garantit qu'ils restent cohérents.
 
+## Faut-il fournir un minimap.gfx ?
+
+Pour l'essentiel, non — et c'est délibéré.
+
+Le `minimap.gfx` n'est pas un fichier passif : le jeu *appelle dedans*.
+`SETUP_HEALTH_ARMOUR` est une méthode Scaleform invoquée sur ce movie. Générer
+un `.gfx` de zéro obligerait donc à réimplémenter tout le contrat ActionScript
+de Rockstar, et la moindre méthode manquante casse le HUD.
+
+L'outil prend le chemin inverse : il émet un `client.lua` qui appelle ces
+mêmes méthodes sur le Scaleform vanilla. Masquer les barres de vie et d'armure
+ne demande alors **aucun asset du jeu**.
+
+| Besoin | Moyen | Asset requis |
+| --- | --- | --- |
+| Forme du radar | masque alpha dans `graphics.ytd` | `graphics.ytd` |
+| Masquer vie/armure | `client.lua` généré | aucun |
+| Repositionner le HUD, déplacer la boussole | patch du `minimap.gfx` | `minimap.gfx` |
+
+`crates/core/src/lua.rs` expose `limitations()`, qui énumère ce que les natives
+ne savent pas faire, pour que l'interface le dise au lieu de laisser
+l'utilisateur le découvrir en jeu.
+
+## Mise à jour automatique
+
+L'application interroge les releases GitHub au démarrage et affiche un bandeau
+lorsqu'une version plus récente existe.
+
+La vérification liste les releases au lieu d'interroger `/releases/latest` :
+cet endpoint **exclut les préversions** et renvoie 404 tant qu'aucune version
+stable n'est publiée.
+
+L'installation silencieuse n'est pas encore branchée. Elle demande soit le
+plugin updater de Tauri, qui exige une paire de clés de signature dont la
+privée doit vivre dans les secrets du dépôt, soit — pour le portable — un
+mécanisme de renommage puis relance, l'exécutable en cours ne pouvant pas être
+écrasé sous Windows.
+
 ## Architecture
 
 ```
@@ -56,9 +94,9 @@ Deux invariants portent le projet :
 | 2 · Modèle de forme, éditeur, aperçu live | ✅ |
 | 3 · Rasterizer + DDS (Rust) | ✅ |
 | 5 · Patcher GFX par splice d'octets | ✅ |
-| 6 · Emitter resource | ✅ (conversion Alchemist à brancher) |
+| 6 · Emitter resource + script client Lua | ✅ (conversion Alchemist à brancher) |
+| 7 · Packaging NSIS + portable | ✅ via GitHub Actions |
 | 4 · Sidecar YTD | à faire — demande le SDK .NET |
-| 7 · Packaging NSIS + portable | à faire — demande un host Windows |
 
 Le cœur Rust est couvert par 28 tests. Deux d'entre eux portent le projet :
 
@@ -75,6 +113,7 @@ Le cœur Rust est couvert par 28 tests. Deux d'entre eux portent le projet :
 pnpm install
 pnpm dev        # éditeur seul, dans le navigateur
 pnpm build      # typecheck + build de production
+pnpm test       # tests du frontend
 pnpm outlines   # régénère les contours de référence pour le test de conformité
 
 cargo test      # cœur métier Rust
