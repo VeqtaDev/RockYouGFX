@@ -80,7 +80,13 @@ jobs:
           fi
           cp "$setup" "dist-release/RockYouGFX-${{ steps.meta.outputs.tag }}-setup.exe"
 
+          # Empreintes publiées avec la release : l'auto-update du portable les
+          # compare au fichier téléchargé avant de remplacer quoi que ce soit.
+          # Le glob se limite aux .exe pour ne pas se hacher soi-même.
+          (cd dist-release && sha256sum *.exe > SHA256SUMS.txt)
+
           ls -la dist-release
+          cat dist-release/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:

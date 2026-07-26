@@ -65,3 +65,31 @@ export async function pickDds(title: string): Promise<string | null> {
 export function revealInExplorer(path: string): Promise<void> {
   return revealItemInDir(path)
 }
+
+/** Faux pour une installation NSIS, qui se met à jour par son installeur. */
+export function canSelfUpdate(): Promise<boolean> {
+  return invoke<boolean>('can_self_update')
+}
+
+/**
+ * Remplace le binaire portable puis relance.
+ *
+ * L'appel ne rend jamais la main en cas de succès : le backend termine le
+ * processus courant après avoir lancé le nouveau.
+ */
+export function applyPortableUpdate(bytes: Uint8Array, sha256: string): Promise<void> {
+  // Transmis en base64, pas en tableau d'octets : l'IPC de Tauri sérialise en
+  // JSON, et 3 Mo deviendraient un tableau de trois millions de nombres.
+  return invoke('apply_portable_update', { payloadB64: toBase64(bytes), sha256 })
+}
+
+function toBase64(bytes: Uint8Array): string {
+  // Par tranches : `String.fromCharCode(...)` sur plusieurs millions d'octets
+  // dépasse la taille maximale de la pile d'arguments.
+  const CHUNK = 0x8000
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return btoa(binary)
+}

@@ -61,11 +61,32 @@ La vérification liste les releases au lieu d'interroger `/releases/latest` :
 cet endpoint **exclut les préversions** et renvoie 404 tant qu'aucune version
 stable n'est publiée.
 
-L'installation silencieuse n'est pas encore branchée. Elle demande soit le
-plugin updater de Tauri, qui exige une paire de clés de signature dont la
-privée doit vivre dans les secrets du dépôt, soit — pour le portable — un
-mécanisme de renommage puis relance, l'exécutable en cours ne pouvant pas être
-écrasé sous Windows.
+Depuis la v0.1.2, la version **portable** se remplace elle-même : elle
+télécharge le nouveau binaire, en vérifie l'empreinte, se substitue et
+relance.
+
+Windows interdit de supprimer un exécutable en cours, mais autorise à le
+renommer. Le remplacement s'appuie sur ce détail : l'exe courant est renommé
+en `.old`, le nouveau prend sa place, l'application relance, et le `.old` est
+supprimé au démarrage suivant — quand il n'est plus verrouillé.
+
+La version **installée** ne se met pas à jour ainsi : son dossier n'est pas
+accessible en écriture sans élévation, et son désinstalleur tient le registre
+de ce qui est installé. La présence d'un `uninstall.exe` à côté du binaire
+sert à distinguer les deux cas.
+
+**Une release publiée avant la v0.1.2 ne peut pas être mise à jour
+automatiquement** : un binaire ne contient que le code présent au moment de
+son build. Elle affiche un lien de téléchargement.
+
+### Portée de la vérification
+
+Le fichier téléchargé est comparé au SHA-256 publié dans la release
+(`SHA256SUMS.txt`, généré par la CI). C'est une garantie d'**intégrité** — un
+téléchargement tronqué ou corrompu est rejeté avant toute écriture — mais pas
+d'**authenticité** : une release compromise porterait aussi ses propres
+empreintes. L'authenticité demande le plugin updater de Tauri et sa paire de
+clés de signature, dont la privée doit vivre dans les secrets du dépôt.
 
 ## Architecture
 

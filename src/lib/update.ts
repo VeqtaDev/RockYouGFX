@@ -32,8 +32,12 @@ export interface UpdateInfo {
   notes: string
   /** Exécutable portable, absent si la release ne le publie pas. */
   portableUrl?: string
+  /** Nom du fichier portable, pour retrouver son empreinte dans SHA256SUMS. */
+  portableName?: string
   /** Installeur NSIS. */
   setupUrl?: string
+  /** Empreintes publiées avec la release. Absentes des releases antérieures à la v0.1.2. */
+  checksumsUrl?: string
 }
 
 interface GhAsset {
@@ -99,17 +103,87 @@ export async function checkForUpdate(signal?: AbortSignal): Promise<UpdateInfo |
     if (compareVersions(tag, CURRENT_VERSION) <= 0) return null
 
     const assets = data.assets ?? []
-    const find = (suffix: string) =>
-      assets.find((a) => a.name.toLowerCase().endsWith(suffix))?.browser_download_url
+    const findAsset = (suffix: string) =>
+      assets.find((a) => a.name.toLowerCase().endsWith(suffix))
+    const portable = findAsset('portable.exe')
 
     return {
       version: tag.replace(/^v/, ''),
       url: data.html_url ?? `https://github.com/${REPO}/releases/latest`,
       notes: data.body ?? '',
-      portableUrl: find('portable.exe'),
-      setupUrl: find('setup.exe'),
+      portableUrl: portable?.browser_download_url,
+      portableName: portable?.name,
+      setupUrl: findAsset('setup.exe')?.browser_download_url,
+      checksumsUrl: assets.find((a) => a.name === 'SHA256SUMS.txt')
+        ?.browser_download_url,
     }
   } catch {
     return null
   }
+}
+
+/**
+ * Extrait l'empreinte d'un fichier d'un contenu au format `sha256sum`.
+ *
+ * Chaque ligne vaut `<empreinte>  <nom de fichier>`, avec deux espaces. Le nom
+ * peut être préfixé de `*` en mode binaire, d'où le nettoyage.
+ */
+export function parseChecksums(text: string, fileName: string): string | null {
+  for (const line of text.split('\n')) {
+    const m = line.trim().match(/^([0-9a-fA-F]{64})\s+\*?(.+)$/)
+    if (m && m[2]!.trim() === fileName) return m[1]!.toLowerCase()
+  }
+  return null
+}
+
+/**
+ * Télécharge le portable et son empreinte.
+ *
+ * Renvoie l'octet brut et l'empreinte attendue ; c'est le backend qui vérifie
+ * et remplace, la vérification devant précéder toute écriture sur le disque.
+ */
+export async function fetchPortableUpdate(
+  info: UpdateInfo,
+  onProgress?: (received: number, total: number) => void,
+): Promise<{ bytes: Uint8Array; sha256: string }> {
+  if (!info.portableUrl || !info.portableName) {
+    throw new Error("cette release ne publie pas d'exécutable portable")
+  }
+  if (!info.checksumsUrl) {
+    throw new Error(
+      "cette release ne publie pas d'empreintes : mise à jour automatique impossible",
+    )
+  }
+
+  const sumsRes = await fetch(info.checksumsUrl)
+  if (!sumsRes.ok) throw new Error(`empreintes inaccessibles (${sumsRes.status})`)
+  const sha256 = parseChecksums(await sumsRes.text(), info.portableName)
+  if (!sha256) throw new Error(`aucune empreinte pour ${info.portableName}`)
+
+  const res = await fetch(info.portableUrl)
+  if (!res.ok) throw new Error(`téléchargement échoué (${res.status})`)
+
+  const total = Number(res.headers.get('content-length') ?? 0)
+  const reader = res.body?.getReader()
+  if (!reader) {
+    return { bytes: new Uint8Array(await res.arrayBuffer()), sha256 }
+  }
+
+  const chunks: Uint8Array[] = []
+  let received = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    received += value.length
+    onProgress?.(received, total)
+  }
+
+  const bytes = new Uint8Array(received)
+  let offset = 0
+  for (const c of chunks) {
+    bytes.set(c, offset)
+    offset += c.length
+  }
+  return { bytes, sha256 }
 }

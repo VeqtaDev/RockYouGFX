@@ -2,6 +2,8 @@
 // une console noire derrière la fenêtre.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod updater;
+
 use rockyougfx_core::{dds, emitter, gfx, lua, mask, shape::MinimapShape};
 use serde::Serialize;
 use std::path::PathBuf;
@@ -210,13 +212,59 @@ fn export_resource(req: ExportRequest) -> CmdResult<ExportReport> {
     })
 }
 
+/// L'application peut-elle se remplacer elle-même ?
+///
+/// Faux pour une installation NSIS, dont le désinstalleur tient le registre de
+/// ce qui est installé, et dont le dossier n'est de toute façon pas accessible
+/// en écriture sans élévation.
+#[tauri::command]
+fn can_self_update() -> bool {
+    std::env::current_exe()
+        .map(|exe| !updater::is_installed(&exe))
+        .unwrap_or(false)
+}
+
+/// Remplace le binaire portable puis relance l'application.
+///
+/// Le téléchargement est fait par le frontend : `fetch` sait déjà suivre les
+/// redirections de GitHub, et éviter un client HTTP côté Rust garde
+/// l'exécutable portable léger.
+#[tauri::command]
+fn apply_portable_update(
+    app: tauri::AppHandle,
+    payload_b64: String,
+    sha256: String,
+) -> CmdResult<()> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(payload_b64.as_bytes())
+        .map_err(|e| io_err("décodage du binaire téléchargé", e))?;
+
+    let exe = updater::swap_binary(&bytes, &sha256).map_err(|e| e.to_string())?;
+
+    std::process::Command::new(exe)
+        .spawn()
+        .map_err(|e| io_err("relance de l'application", e))?;
+
+    // Laisser Tauri fermer proprement : un exit brutal laisserait la WebView
+    // derrière lui, et deux fenêtres se chevaucheraient le temps qu'elle meure.
+    app.exit(0);
+    Ok(())
+}
+
 fn main() {
+    // Le binaire évincé par une mise à jour précédente n'était pas supprimable
+    // tant qu'il tournait : c'est ici, au démarrage suivant, qu'il part.
+    updater::cleanup_previous();
+
     tauri::Builder::default()
         // dialog : sélection du dossier de sortie et des DDS vanilla.
         // opener : ouvrir le dossier produit dans l'explorateur.
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            apply_portable_update,
+            can_self_update,
             dds_info,
             export_masks,
             export_resource,
