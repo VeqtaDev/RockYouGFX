@@ -16,6 +16,7 @@ pub mod gfx;
 pub mod lua;
 pub mod mask;
 pub mod shape;
+pub mod vanilla;
 
 pub use shape::MinimapShape;
 
