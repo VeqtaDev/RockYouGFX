@@ -44,14 +44,15 @@ pub fn fxmanifest(name: &str, target: Target, has_client_script: bool) -> String
 
 /// Assemble la resource complète.
 ///
-/// `graphics_ytd` porte les masques réécrits ; `minimap_gfx` le Scaleform
-/// patché. Les deux sont optionnels, mais n'en fournir qu'un donne une minimap
-/// incohérente — masque sans bordure assortie, ou bordure sans changement de
-/// forme.
+/// `mask_ytd` est le dictionnaire de masques : son nom (sans extension) et son
+/// contenu. Il est livré sous un nom **propre à la resource**, jamais sous
+/// `graphics.ytd` : un dictionnaire de base du jeu n'est pas surchargeable par
+/// `stream/`, alors qu'un dictionnaire nouveau se streame normalement. C'est le
+/// `client.lua` qui demande ensuite au jeu d'y piocher les masques.
 pub fn build_resource(
     name: &str,
     target: Target,
-    graphics_ytd: Option<Vec<u8>>,
+    mask_ytd: Option<(String, Vec<u8>)>,
     minimap_gfx: Option<Vec<u8>>,
     client_lua: Option<String>,
 ) -> Vec<ResourceFile> {
@@ -60,8 +61,8 @@ pub fn build_resource(
         data: fxmanifest(name, target, client_lua.is_some()).into_bytes(),
     }];
 
-    if let Some(data) = graphics_ytd {
-        files.push(ResourceFile { path: "stream/graphics.ytd".into(), data });
+    if let Some((dict, data)) = mask_ytd {
+        files.push(ResourceFile { path: format!("stream/{dict}.ytd"), data });
     }
     if let Some(data) = minimap_gfx {
         files.push(ResourceFile { path: "stream/minimap.gfx".into(), data });
@@ -85,42 +86,39 @@ pub fn readme(name: &str) -> String {
 
 Généré par RockYouGFX.
 
-## Il reste une étape, et une seule
-
-Les deux fichiers du dossier `masks/` ne sont **pas** utilisables tels quels :
-GTA V ne lit pas un `.dds` isolé, il lit un dictionnaire de textures. Il faut
-les injecter dans `graphics.ytd`.
-
-1. Ouvrir OpenIV ou CodeWalker.
-2. Aller dans `update/update.rpf/x64/textures/graphics.ytd`.
-3. Extraire `graphics.ytd` (mode édition activé).
-4. L'ouvrir, puis **remplacer** les deux textures existantes par celles du
-   dossier `masks/` : `radarmasksm` et `radarmasklg`.
-   Remplacer, pas ajouter — les noms doivent rester identiques.
-5. Enregistrer, puis déposer le `graphics.ytd` obtenu dans le dossier
-   `stream/` de cette resource.
-
 ## Installation
 
-Copier ce dossier dans le `resources/` du serveur, puis ajouter dans le
-`server.cfg` :
+1. Copier ce dossier dans le `resources/` du serveur.
+2. Ajouter dans le `server.cfg` :
 
 ```
 ensure {name}
 ```
 
-## Pourquoi ces masques et pas un minimap.gfx
+3. Vider le cache FiveM (`%localappdata%\FiveM\FiveM.app\data\cache`) : un
+   asset déjà en cache masquerait le changement.
 
-La forme du radar vient du canal alpha de `radarmasksm.dds` et
-`radarmasklg.dds`. Le `minimap.gfx` ne porte que ce qui est dessiné par-dessus :
-bordure, barres de vie et d'armure, boussole.
+## Comment ça marche
 
-Ne remplacer que le `.gfx` ne change donc **rien** à la forme. C'est l'erreur
-la plus courante quand on personnalise une minimap.
+La forme du radar vient de la **luminance** de deux textures, `radarmasksm`
+(minimap courante) et `radarmasklg` (carte agrandie). Elles vivent normalement
+dans `graphics.ytd`.
 
-`radarmasksm` est la minimap courante, `radarmasklg` la carte agrandie. Les
-deux dérivent de la même forme : ne remplacer que l'une donne un radar qui
-change d'allure dès qu'on ouvre la carte.
+Mais `graphics.ytd` est un dictionnaire **de base** du jeu : en déposer une
+version modifiée dans `stream/` n'a aucun effet, FiveM ne la relit pas. C'est
+le piège de cette personnalisation.
+
+Cette resource contourne le problème : elle livre son **propre** dictionnaire,
+qui se streame normalement, et le `client.lua` demande au jeu d'y piocher les
+deux masques via `AddReplaceTexture`. Aucun fichier du jeu n'est remplacé.
+
+Le dossier `masks/` contient les mêmes masques en `.dds` : ils ne servent qu'au
+contrôle visuel, la resource n'en a pas besoin.
+
+## Ce qui n'est pas modifié
+
+Le `minimap.gfx` reste celui du jeu. La bordure du radar et la boussole gardent
+donc la forme vanilla, même si le radar change de forme.
 "#
     )
 }
@@ -130,10 +128,12 @@ pub fn warnings(files: &[ResourceFile]) -> Vec<String> {
     let has = |p: &str| files.iter().any(|f| f.path == p);
     let mut out = Vec::new();
 
-    if !has("stream/graphics.ytd") {
+    let has_mask = files.iter().any(|f| f.path.starts_with("stream/") && f.path.ends_with(".ytd"));
+    if !has_mask {
         out.push(
-            "Sans graphics.ytd, la forme du radar ne changera pas : c'est le \
-             masque alpha qui la définit, pas le .gfx."
+            "Aucun dictionnaire de masques n'est livré : la forme du radar ne \
+             changera pas. C'est la luminance de radarmasksm/radarmasklg qui la \
+             définit, pas le .gfx."
                 .into(),
         );
     }
@@ -175,14 +175,14 @@ mod tests {
 
     #[test]
     fn la_resource_place_les_assets_dans_stream() {
-        let files = build_resource("x", Target::Enhanced, Some(vec![1]), Some(vec![2]), None);
+        let files = build_resource("x", Target::Enhanced, Some(("m".into(), vec![1])), Some(vec![2]), None);
         let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
-        assert_eq!(paths, vec!["fxmanifest.lua", "stream/graphics.ytd", "stream/minimap.gfx"]);
+        assert_eq!(paths, vec!["fxmanifest.lua", "stream/m.ytd", "stream/minimap.gfx"]);
     }
 
     #[test]
     fn une_resource_complete_ne_leve_aucun_avertissement() {
-        let files = build_resource("x", Target::Legacy, Some(vec![1]), Some(vec![2]), None);
+        let files = build_resource("x", Target::Legacy, Some(("m".into(), vec![1])), Some(vec![2]), None);
         assert!(warnings(&files).is_empty());
     }
 
@@ -192,7 +192,7 @@ mod tests {
         let files = build_resource("x", Target::Legacy, None, Some(vec![2]), None);
         let w = warnings(&files);
         assert_eq!(w.len(), 1);
-        assert!(w[0].contains("masque alpha"));
+        assert!(w[0].contains("dictionnaire de masques"));
     }
 
     /// Le cas qui rend l'outil utilisable sans aucun asset Rockstar : masque +
@@ -203,12 +203,12 @@ mod tests {
         let files = build_resource(
             "x",
             Target::Legacy,
-            Some(vec![1]),
+            Some(("m".into(), vec![1])),
             None,
             Some("-- lua".into()),
         );
         let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
-        assert_eq!(paths, vec!["fxmanifest.lua", "stream/graphics.ytd", "client.lua"]);
+        assert_eq!(paths, vec!["fxmanifest.lua", "stream/m.ytd", "client.lua"]);
         assert!(warnings(&files).is_empty());
     }
 }

@@ -15,19 +15,73 @@ use crate::shape::{HudMode, MinimapShape};
 /// Valeur de `SETUP_HEALTH_ARMOUR` masquant les deux barres.
 const HEALTH_ARMOUR_HIDDEN: u8 = 3;
 
+/// Chemin du dictionnaire de base contenant les masques de radar.
+///
+/// Ce n'est pas `graphics` tout court : le native attend le chemin de
+/// plateforme complet.
+const BASE_DICT: &str = "platform:/textures/graphics";
+
+/// Substitution des masques par le native `AddReplaceTexture`.
+///
+/// **C'est la seule méthode qui fonctionne sur FiveM.** Déposer un
+/// `graphics.ytd` modifié dans `stream/` n'a aucun effet : c'est un
+/// dictionnaire de base du jeu, et la surcharge par nom de fichier ne s'y
+/// applique pas. En revanche, un dictionnaire *nouveau* se streame
+/// normalement ; il suffit alors de demander au jeu d'y piocher les deux
+/// textures à la place des siennes.
+fn replace_masks(dict: &str) -> String {
+    format!(
+        r#"
+-- Substitution des masques de radar.
+--
+-- Le dictionnaire {dict} est fourni par cette resource. Remplacer
+-- directement graphics.ytd ne marcherait pas : c'est un dictionnaire de base,
+-- que le jeu ne relit pas depuis stream/.
+CreateThread(function()
+    RequestStreamedTextureDict('{dict}', false)
+    while not HasStreamedTextureDictLoaded('{dict}') do
+        Wait(0)
+    end
+
+    for _, mask in ipairs({{ 'radarmasksm', 'radarmasklg' }}) do
+        AddReplaceTexture('{BASE_DICT}', mask, '{dict}', mask)
+    end
+
+    -- Le radar ne relit ses textures qu'au changement d'état : basculer le
+    -- bigmap puis revenir force la prise en compte.
+    SetRadarBigmapEnabled(true, false)
+    Wait(0)
+    SetRadarBigmapEnabled(false, false)
+end)
+"#
+    )
+}
+
 /// Le script client, ou `None` si la forme ne demande aucune intervention.
 ///
 /// Renvoyer `None` plutôt qu'un fichier vide évite de déclarer un
 /// `client_script` inutile dans le manifeste.
-pub fn client_script(shape: &MinimapShape) -> Option<String> {
+///
+/// `mask_dict` est le nom du dictionnaire de textures embarqué par la
+/// resource, sans extension. `None` si aucun masque n'est livré.
+pub fn client_script(shape: &MinimapShape, mask_dict: Option<&str>) -> Option<String> {
     let hide_bars =
         shape.hud.health == HudMode::Hidden && shape.hud.armour == HudMode::Hidden;
 
-    if !hide_bars {
+    let mut script = String::new();
+    if let Some(dict) = mask_dict {
+        script.push_str(&replace_masks(dict));
+    }
+    if !hide_bars && script.is_empty() {
         return None;
     }
+    if !hide_bars {
+        return Some(format!(
+            "-- Généré par RockYouGFX.\n{script}"
+        ));
+    }
 
-    Some(format!(
+    Some(script + &format!(
         r#"-- Généré par RockYouGFX.
 --
 -- Les barres de vie et d'armure sont masquées en appelant la méthode
@@ -102,13 +156,13 @@ mod tests {
     #[test]
     fn aucun_script_quand_le_hud_reste_vanilla() {
         let s = with_hud(HudMode::Vanilla, HudMode::Vanilla, HudMode::Vanilla);
-        assert!(client_script(&s).is_none());
+        assert!(client_script(&s, None).is_none());
     }
 
     #[test]
     fn les_deux_barres_masquees_produisent_le_script() {
         let s = with_hud(HudMode::Hidden, HudMode::Hidden, HudMode::Vanilla);
-        let lua = client_script(&s).expect("script attendu");
+        let lua = client_script(&s, None).expect("script attendu");
         assert!(lua.contains("SETUP_HEALTH_ARMOUR"));
         assert!(lua.contains("ScaleformMovieMethodAddParamInt(3)"));
         // Le rafraîchissement par bascule du bigmap est indispensable.
@@ -120,9 +174,32 @@ mod tests {
     #[test]
     fn masquer_une_seule_barre_est_signale_comme_limite() {
         let s = with_hud(HudMode::Hidden, HudMode::Vanilla, HudMode::Vanilla);
-        assert!(client_script(&s).is_none());
+        assert!(client_script(&s, None).is_none());
         let lims = limitations(&s);
         assert!(lims.iter().any(|l| l.contains("SETUP_HEALTH_ARMOUR")));
+    }
+
+    /// Le point qui a fait échouer les premières versions : sans ces appels,
+    /// le .ytd livré n'est jamais consulté par le jeu.
+    #[test]
+    fn le_dictionnaire_de_masques_declenche_la_substitution() {
+        let s = with_hud(HudMode::Vanilla, HudMode::Vanilla, HudMode::Vanilla);
+        let lua = client_script(&s, Some("mes_masques")).expect("script attendu");
+        assert!(lua.contains("AddReplaceTexture"));
+        assert!(lua.contains("platform:/textures/graphics"));
+        assert!(lua.contains("mes_masques"));
+        assert!(lua.contains("radarmasksm") && lua.contains("radarmasklg"));
+        // Sans attendre le chargement, la substitution porterait dans le vide.
+        assert!(lua.contains("HasStreamedTextureDictLoaded"));
+    }
+
+    /// Masques et masquage des barres doivent cohabiter dans un seul fichier.
+    #[test]
+    fn les_deux_traitements_cohabitent() {
+        let s = with_hud(HudMode::Hidden, HudMode::Hidden, HudMode::Vanilla);
+        let lua = client_script(&s, Some("d")).expect("script attendu");
+        assert!(lua.contains("AddReplaceTexture"));
+        assert!(lua.contains("SETUP_HEALTH_ARMOUR"));
     }
 
     #[test]

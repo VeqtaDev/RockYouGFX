@@ -194,8 +194,18 @@ fn export_resource(req: ExportRequest) -> CmdResult<ExportReport> {
         patched = Some(dict.write().map_err(|e| io_err("réécriture du graphics.ytd", e))?);
     }
 
-    let client_lua = lua::client_script(&req.shape);
-    let mut files = emitter::build_resource(&name, target, patched, None, client_lua);
+    // Nom du dictionnaire livré. Les tirets passent en soulignés : un nom de
+    // dictionnaire de textures doit rester un identifiant simple.
+    let dict = format!("{}_masks", name.replace('-', "_"));
+    let client_lua =
+        lua::client_script(&req.shape, patched.as_ref().map(|_| dict.as_str()));
+    let mut files = emitter::build_resource(
+        &name,
+        target,
+        patched.map(|d| (dict.clone(), d)),
+        None,
+        client_lua,
+    );
     files.push(emitter::ResourceFile {
         path: "LISEZ-MOI.md".into(),
         data: emitter::readme(&name).into_bytes(),
