@@ -34,24 +34,45 @@ fn replace_masks(dict: &str) -> String {
         r#"
 -- Substitution des masques de radar.
 --
--- Le dictionnaire {dict} est fourni par cette resource. Remplacer
--- directement graphics.ytd ne marcherait pas : c'est un dictionnaire de base,
--- que le jeu ne relit pas depuis stream/.
+-- Le dictionnaire {dict} est fourni par cette resource. Remplacer directement
+-- graphics.ytd ne marcherait pas : c'est un dictionnaire de base, que FiveM ne
+-- relit pas depuis stream/.
 CreateThread(function()
-    RequestStreamedTextureDict('{dict}', false)
-    while not HasStreamedTextureDictLoaded('{dict}') do
-        Wait(0)
+    local DICT = '{dict}'
+
+    RequestStreamedTextureDict(DICT, false)
+
+    -- Borne l'attente. Sans elle, un dictionnaire qui ne se charge pas laisse
+    -- la boucle tourner indéfiniment, sans le moindre message : l'utilisateur
+    -- constate seulement que « rien ne se passe ».
+    local waited = 0
+    while not HasStreamedTextureDictLoaded(DICT) do
+        Wait(50)
+        waited = waited + 50
+        if waited >= 10000 then
+            print('[RockYouGFX] ERREUR : le dictionnaire ' .. DICT ..
+                  ' ne se charge pas apres 10 s.')
+            print('[RockYouGFX] Verifiez que stream/' .. DICT ..
+                  '.ytd est bien present et que le cache FiveM a ete vide.')
+            return
+        end
     end
+
+    print('[RockYouGFX] dictionnaire ' .. DICT .. ' charge en ' .. waited .. ' ms.')
 
     for _, mask in ipairs({{ 'radarmasksm', 'radarmasklg' }}) do
-        AddReplaceTexture('{BASE_DICT}', mask, '{dict}', mask)
+        AddReplaceTexture('{BASE_DICT}', mask, DICT, mask)
+        print('[RockYouGFX] ' .. mask .. ' remplace.')
     end
 
-    -- Le radar ne relit ses textures qu'au changement d'état : basculer le
+    -- Le radar ne relit ses textures qu'au changement d'etat : basculer le
     -- bigmap puis revenir force la prise en compte.
     SetRadarBigmapEnabled(true, false)
     Wait(0)
     SetRadarBigmapEnabled(false, false)
+
+    print('[RockYouGFX] termine. Si la forme est inchangee, le .ytd se charge ' ..
+          'mais AddReplaceTexture n a pas pris effet.')
 end)
 "#
     )
