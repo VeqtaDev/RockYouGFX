@@ -141,11 +141,8 @@ export function ExportSheet({
 
                 <Section title="graphics.ytd">
                   <Row
-                    label="Fichier vanilla"
-                    detail={
-                      ytdPath ??
-                      "Sans lui, l'injection des masques reste à faire à la main"
-                    }
+                    label="Fichier vanilla — requis"
+                    detail={ytdPath ?? 'Aucun fichier choisi'}
                   >
                     <Button
                       variant="tinted"
@@ -158,10 +155,14 @@ export function ExportSheet({
                     </Button>
                   </Row>
                   <div className="text-footnote px-4 py-3 text-label-2">
-                    À extraire une fois avec OpenIV ou CodeWalker, depuis{' '}
-                    <span className="font-mono">x64/textures/graphics.ytd</span>. Le
-                    fichier fourni n'est pas modifié : une copie patchée est écrite
-                    dans la resource.
+                    Sert de source aux deux textures de masque. À extraire une seule
+                    fois avec OpenIV ou CodeWalker, depuis{' '}
+                    <span className="font-mono">x64/textures/graphics.ytd</span>.
+                    <br />
+                    Votre fichier n'est ni modifié ni déplacé : la resource embarque
+                    son propre dictionnaire, sous un nom à elle, et un{' '}
+                    <span className="font-mono">client.lua</span> demande au jeu d'y
+                    piocher les masques. Aucun fichier du jeu n'est remplacé.
                   </div>
                 </Section>
 
@@ -181,9 +182,10 @@ export function ExportSheet({
                     onRead={() => readFromVanilla('lg')}
                   />
                   <div className="text-footnote px-4 py-3 text-label-2">
-                    Les valeurs par défaut sont arbitraires. Pour être exact, lisez-les
-                    depuis les textures vanilla extraites de{' '}
-                    <span className="font-mono">graphics.ytd</span>.
+                    Ne servent qu'aux <span className="font-mono">.dds</span> de
+                    contrôle écrits dans <span className="font-mono">masks/</span>.
+                    Les masques réellement livrés reprennent les dimensions lues dans
+                    votre <span className="font-mono">graphics.ytd</span>.
                   </div>
                 </Section>
 
@@ -196,7 +198,7 @@ export function ExportSheet({
                 <div className="flex items-center gap-3">
                   <Button
                     variant="filled"
-                    disabled={!outDir || busy || !isTauri()}
+                    disabled={!outDir || !ytdPath || busy || !isTauri()}
                     onClick={run}
                   >
                     {busy ? 'Export…' : 'Exporter'}
